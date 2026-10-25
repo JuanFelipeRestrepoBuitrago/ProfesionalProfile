@@ -1,0 +1,112 @@
+name: profesional-profile-manager
+version: 1.0.0
+description: AI-assisted career-document workspace — canonical CVs, styled Word/PDF
+    exports, and LinkedIn sync — portable across Kiro, Claude Code, and Codex.
+author: Juan Felipe Restrepo Buitrago
+# Which agent platforms to deploy to.
+# Resolution order: --target flag > this field > auto-detect from filesystem.
+targets:
+    - kiro
+    - claude
+    - codex
+dependencies:
+    # Local primitives (instructions, skills) live under .apm/ and are picked up
+    # by `includes: auto`; only web/registry and MCP deps are declared here.
+    apm: []
+    mcp:
+        # document-loader — PDF/DOCX/DOC -> text extraction (stdio, uvx).
+        - name: document-loader
+          registry: false
+          transport: stdio
+          command: uvx
+          args:
+              - awslabs.document-loader-mcp-server@latest
+          env:
+              FASTMCP_LOG_LEVEL: ERROR
+
+        # linkedin — read-only LinkedIn profile queries (stdio, uvx).
+        - name: linkedin
+          registry: false
+          transport: stdio
+          command: uvx
+          args:
+              - mcp-server-linkedin@latest
+          env:
+              UV_HTTP_TIMEOUT: '300'
+
+        # engram — persistent cross-session memory. ${ENGRAM_BIN} is the engram
+        # binary path (machine-specific); see README "Machine-specific values".
+        - name: engram
+          registry: false
+          transport: stdio
+          command: ${ENGRAM_BIN}
+          args:
+              - mcp
+              - --tools=agent
+              - --project
+              - profesional-profile-manager
+          disabledTools:
+              - mem_delete
+              - mem_doctor
+              - mem_judge
+              - mem_compare
+              - mem_current_project
+
+        # office-mcp — Word/Excel/PPTX read + PDF export. ${OFFICE_MCP_PYTHON} and
+        # ${OFFICE_MCP_SERVER} are machine-specific; ${PROJECT_ROOT} is this repo.
+        - name: office-mcp
+          registry: false
+          transport: stdio
+          command: ${OFFICE_MCP_PYTHON}
+          args:
+              - ${OFFICE_MCP_SERVER}
+          env:
+              PYTHONUTF8: '1'
+              PYTHONIOENCODING: utf-8
+              OFFICE_MCP_DEFAULT_FOLDER: ${PROJECT_ROOT}
+          disabledTools:
+              - excel_create_workbook
+              - excel_get_info
+              - excel_list_sheets
+              - excel_read_sheet
+              - excel_write_cell
+              - excel_write_range
+              - excel_create_sheet
+              - excel_delete_sheet
+              - excel_format_cells
+              - excel_add_chart
+              - excel_rename_sheet
+              - excel_export_csv
+              - excel_export_pdf
+              - excel_export_html
+              - list_documents
+              - get_document_info
+              - search_text
+              - pptx_create_presentation
+              - pptx_get_info
+              - pptx_list_slides
+              - pptx_read_slide
+              - pptx_add_slide
+              - pptx_delete_slide
+              - pptx_reorder_slides
+              - pptx_add_text_box
+              - pptx_add_image
+              - pptx_add_shape
+              - pptx_add_table
+              - pptx_add_chart
+              - pptx_export_pdf
+              - pptx_export_html
+              - word_create_document
+              - word_read_paragraph
+              - word_add_paragraph
+              - word_add_heading
+              - word_find_replace
+              - word_format_run
+              - word_add_table
+              - word_add_image
+              - word_add_header
+              - word_add_footer
+              - word_set_section
+              - word_export_html
+includes: auto
+scripts: {}

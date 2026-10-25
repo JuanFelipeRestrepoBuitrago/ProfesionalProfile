@@ -74,46 +74,79 @@ Core requirements:
 - **An AI tool** — Kiro, Claude Code, or Codex. The repo ships a single APM
   source of truth; `apm install` generates the config for whichever you use.
 
-### Install (Linux)
+The `uvx`-based servers (`document-loader`, `linkedin`) are fetched on first
+run by `uvx` — there is nothing to install for them beyond `uv` itself. `apm`
+writes each server's launch command into the harness config; it does **not**
+install the programs those commands invoke, so install the runtimes below once
+per machine.
+
+### Install (Linux — Ubuntu/Debian)
 
 ```bash
-# Python (Debian/Ubuntu)
-sudo apt update && sudo apt install -y python3 python3-pip libreoffice
+# 1. Python 3.10+ and LibreOffice (headless soffice for DOCX → PDF export)
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv libreoffice
 
-# uv / uvx (standalone installer)
+# 2. uv / uvx (standalone installer — ships both binaries)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-#   adds uv + uvx to ~/.local/bin — ensure it's on PATH
+#   installs to ~/.local/bin — restart the shell or:
+source "$HOME/.local/bin/env"        # ensures uv + uvx are on PATH
 
-# engram (if you use the memory MCP) — install per its own instructions,
-# then confirm the binary is reachable:
+# 3. office-mcp — the launch command expects a venv at ~/tools/office-mcp/
+git clone <office-mcp-repo> ~/tools/office-mcp
+python3 -m venv ~/tools/office-mcp/.venv
+~/tools/office-mcp/.venv/bin/pip install -r ~/tools/office-mcp/requirements.txt
+
+# 4. engram (persistent-memory MCP) — expected at ~/.local/bin/engram.
+#    Install the Engram CLI per its own docs, then confirm it's reachable:
 command -v engram
 ```
 
 ### Install (macOS)
 
 ```bash
-# Homebrew
+# 1. Homebrew packages — python, LibreOffice, and uv (uvx ships with uv)
 brew install python libreoffice uv
-# uv ships uvx alongside it
 
-command -v engram   # install engram separately if needed
+# 2. office-mcp venv at ~/tools/office-mcp/
+git clone <office-mcp-repo> ~/tools/office-mcp
+python3 -m venv ~/tools/office-mcp/.venv
+~/tools/office-mcp/.venv/bin/pip install -r ~/tools/office-mcp/requirements.txt
+
+# 3. engram — install the Engram CLI, then verify:
+command -v engram
 ```
+
+> On Apple Silicon, Homebrew lives at `/opt/homebrew/bin`; make sure it's on
+> your `PATH` so `soffice`, `uv`, and `uvx` resolve.
 
 ### Install (Windows)
 
-Use PowerShell (or WSL — this repo's tooling was authored on WSL/Ubuntu, so WSL
-is the smoothest path):
+The office MCP paths in `apm.yml` use POSIX layout (`${HOME}/tools/office-mcp/...`),
+so **WSL (Ubuntu)** is the smoothest path — install WSL, then follow the Linux
+steps verbatim inside it:
 
 ```powershell
-# winget
+wsl --install -d Ubuntu      # then open the Ubuntu shell and use the Linux steps
+```
+
+To run natively in PowerShell instead, install the runtimes with winget and
+adjust the `office-mcp` `command`/`args` paths in `apm.yml` to Windows paths:
+
+```powershell
+# winget packages
 winget install --id Python.Python.3.12 -e
 winget install --id TheDocumentFoundation.LibreOffice -e
 winget install --id astral-sh.uv -e      # provides uv + uvx
+
+# office-mcp venv (adjust apm.yml paths to match)
+git clone <office-mcp-repo> $HOME\tools\office-mcp
+python -m venv $HOME\tools\office-mcp\.venv
+$HOME\tools\office-mcp\.venv\Scripts\pip install -r $HOME\tools\office-mcp\requirements.txt
 ```
 
-Then make sure `uv`, `uvx`, `python`, `soffice`, and `engram` are on your
-`PATH`. On Windows, prefer running inside **WSL (Ubuntu)** and follow the Linux
-steps for the closest match to the original environment.
+Then confirm `uv`, `uvx`, `python`, `soffice`, and `engram` are all on your
+`PATH`.
 
 ### Verify
 
@@ -165,17 +198,74 @@ apm install --dry-run
 apm compile --validate
 ```
 
-### Machine-specific values
+### Environment variables
 
-`apm.yml` uses `${VAR}` placeholders for paths that differ per machine. Set them
-in your shell before running `apm install` (or launching the tool):
+`apm` keeps every env value in `apm.yml` as a `${VAR}` placeholder and writes
+those placeholders into the generated MCP config (`.kiro/settings/mcp.json`,
+`.mcp.json`, …). **The placeholders are never turned into literals on disk** —
+re-running `apm install` always regenerates them. Each `${VAR}` is resolved by
+the AI tool **when it launches the MCP server**, reading the value from the
+environment of the process that started the tool. So the values must be exported
+in the shell (or login environment) that launches Kiro / Claude / Codex.
 
-| Variable            | Meaning                                  | Example                                         |
-| ------------------- | ---------------------------------------- | ----------------------------------------------- |
-| `ENGRAM_BIN`        | Path to the `engram` binary              | `/home/pipas/.local/bin/engram`                 |
-| `OFFICE_MCP_PYTHON` | Python interpreter for office MCP (venv) | `/home/pipas/tools/office-mcp/.venv/bin/python` |
-| `OFFICE_MCP_SERVER` | Absolute path to office MCP `server.py`  | `/home/pipas/tools/office-mcp/server.py`        |
-| `PROJECT_ROOT`      | This repo's absolute root                | `/home/.../PROFESIONAL_PROFILE`                 |
+Two kinds of variables are used:
+
+| Variable            | Used by           | Set it yourself? | Notes                                                                                                                       |
+| ------------------- | ----------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `HOME`              | `office-mcp`, …   | No               | Provided by the OS                                                                                                          |
+| `PROJECT_ROOT`      | `office-mcp`      | No               | Injected per-workspace by the AI tool — keep it a placeholder so the config stays portable when you open the repo elsewhere |
+| `FASTMCP_LOG_LEVEL` | `document-loader` | Yes              | `ERROR`                                                                                                                     |
+| `UV_HTTP_TIMEOUT`   | `linkedin`        | Yes              | `300` (seconds)                                                                                                             |
+| `PYTHONUTF8`        | `office-mcp`      | Yes              | `1`                                                                                                                         |
+| `PYTHONIOENCODING`  | `office-mcp`      | Yes              | `utf-8`                                                                                                                     |
+
+Do **not** hardcode `HOME` or `PROJECT_ROOT`: the AI tool supplies them at
+runtime from the current workspace, which is what lets the same config work no
+matter where you clone or open the repo. Only the four fixed-value variables
+below need exporting.
+
+#### Linux (zsh — `~/.zshrc`)
+
+```zsh
+# ~/.zshrc — add these, then: source ~/.zshrc
+export FASTMCP_LOG_LEVEL=ERROR
+export UV_HTTP_TIMEOUT=300
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+```
+
+For bash, put the same `export` lines in `~/.bashrc` instead.
+
+#### macOS (zsh — `~/.zshrc`)
+
+macOS uses zsh by default, so the lines are identical:
+
+```zsh
+# ~/.zshrc — add these, then: source ~/.zshrc
+export FASTMCP_LOG_LEVEL=ERROR
+export UV_HTTP_TIMEOUT=300
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+```
+
+#### Windows (PowerShell)
+
+Set them as persistent user environment variables (survives reboots), then
+restart the terminal / AI tool so they're inherited:
+
+```powershell
+[Environment]::SetEnvironmentVariable('FASTMCP_LOG_LEVEL', 'ERROR', 'User')
+[Environment]::SetEnvironmentVariable('UV_HTTP_TIMEOUT', '300', 'User')
+[Environment]::SetEnvironmentVariable('PYTHONUTF8', '1', 'User')
+[Environment]::SetEnvironmentVariable('PYTHONIOENCODING', 'utf-8', 'User')
+```
+
+Running inside **WSL (Ubuntu)**? Use the Linux (zsh/bash) steps instead.
+
+The remaining MCP paths are derived from `HOME`: the `engram` binary is taken
+from `PATH`, and the office MCP runs from `${HOME}/tools/office-mcp/`
+(`.venv/bin/python` + `server.py`). Adjust those paths in `apm.yml` if your
+layout differs.
 
 Never put secrets or access tokens in config files — use environment variables.
 

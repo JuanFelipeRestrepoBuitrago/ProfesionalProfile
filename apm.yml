@@ -7,12 +7,11 @@ author: Juan Felipe Restrepo Buitrago
 # Resolution order: --target flag > this field > auto-detect from filesystem.
 targets:
     - kiro
-    - claude
-    - codex
 dependencies:
-    # Local primitives (instructions, skills) live under .apm/ and are picked up
-    # by `includes: auto`; only web/registry and MCP deps are declared here.
-    apm: []
+    apm:
+        # engram instructions
+        - JuanFelipeRestrepoBuitrago/Linux/.apm/instructions/engram.instructions.md
+        - JuanFelipeRestrepoBuitrago/Linux/.apm/instructions/engram-memory.instructions.md
     mcp:
         # document-loader — PDF/DOCX/DOC -> text extraction (stdio, uvx).
         - name: document-loader
@@ -34,12 +33,11 @@ dependencies:
           env:
               UV_HTTP_TIMEOUT: '300'
 
-        # engram — persistent cross-session memory. ${ENGRAM_BIN} is the engram
-        # binary path (machine-specific); see README "Machine-specific values".
+        # engram — persistent cross-session memory. Resolved from PATH ('engram').
         - name: engram
           registry: false
           transport: stdio
-          command: ${ENGRAM_BIN}
+          command: engram
           args:
               - mcp
               - --tools=agent
@@ -52,14 +50,14 @@ dependencies:
               - mem_compare
               - mem_current_project
 
-        # office-mcp — Word/Excel/PPTX read + PDF export. ${OFFICE_MCP_PYTHON} and
-        # ${OFFICE_MCP_SERVER} are machine-specific; ${PROJECT_ROOT} is this repo.
+        # office-mcp — Word/Excel/PPTX read + PDF export. venv python + server.py
+        # under ${HOME}/tools/office-mcp; ${PROJECT_ROOT} is this repo's root.
         - name: office-mcp
           registry: false
           transport: stdio
-          command: ${OFFICE_MCP_PYTHON}
+          command: ${HOME}/tools/office-mcp/.venv/bin/python
           args:
-              - ${OFFICE_MCP_SERVER}
+              - ${HOME}/tools/office-mcp/server.py
           env:
               PYTHONUTF8: '1'
               PYTHONIOENCODING: utf-8

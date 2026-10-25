@@ -12,8 +12,16 @@ canonical sources — preserving the design's exact fonts, colors, borders,
 images, and spacing. The result is a new `<format>` the generate skill can use
 for any language.
 
-This is the authoring counterpart to `generate-cv-document`: this skill *creates*
-a template; that skill *fills* it.
+This is the authoring counterpart to `generate-cv-document`: this skill _creates_
+a template; that skill _fills_ it.
+
+`<gen-skill-dir>` below is the deployed directory of the `generate-cv-document`
+skill, wherever this agent harness placed it —
+`.kiro/skills/generate-cv-document/` under Kiro,
+`.claude/skills/generate-cv-document/` under Claude Code,
+`.agents/skills/generate-cv-document/` under Codex. Resolve it from the sibling
+skill's location (same skills root as this skill) and never hardcode a single
+harness's folder.
 
 ## Inputs
 
@@ -45,6 +53,7 @@ Static tokens (one occurrence each): `{{FULL_NAME}}`, `{{HEADLINE}}`,
 
 Repeatable blocks, each wrapped in XML comment sentinels and containing exactly
 **one** styled example in the source:
+
 - `<!--REPEAT:EXPERIENCE-->` … `<!--END:EXPERIENCE-->` with `{{EXP_TITLE}}`,
   `{{EXP_COMPANY}}`, `{{EXP_DATES}}`, and a nested
   `<!--REPEAT:EXP_BULLET-->` … `<!--END:EXP_BULLET-->` holding `{{EXP_BULLET}}`.
@@ -55,12 +64,13 @@ Repeatable blocks, each wrapped in XML comment sentinels and containing exactly
 - `<!--REPEAT:ACHIEVEMENT-->` … `<!--END:ACHIEVEMENT-->` with `{{ACHIEVEMENT}}`.
 
 Rules that keep it fillable:
+
 - Each token must sit inside a single `<w:r>`/`<w:t>` run so its styling is
   self-contained. Keep `{{EXP_TITLE}}` and `{{EXP_COMPANY}}` as separate runs if
   they have different colors.
 - A REPEAT block must contain exactly one example item in the template; the
   generator clones it per entry in the CV.
-- The XML comment sentinels go *between* `<w:p>` paragraphs (or between the
+- The XML comment sentinels go _between_ `<w:p>` paragraphs (or between the
   title/date paragraphs and the bullet paragraphs), never inside a run.
 
 ## Steps
@@ -72,45 +82,48 @@ Rules that keep it fillable:
 2. **Study the design**: extract the document with the `document-loader` MCP
    (`read_document`, `file_type:"docx"`) to see section order and content. Then
    extract the raw XML to see the exact styling:
-   ```bash
-   mkdir -p /tmp/tpl_<format> && \
-   unzip -o cv_formats/<format>.docx -d /tmp/tpl_<format> >/dev/null && \
-   cat /tmp/tpl_<format>/word/document.xml
-   ```
-   Read `word/document.xml`. Identify the header block, each section heading,
-   and one representative experience entry (title paragraph, date paragraph,
-   bullet paragraph) to use as the repeat example.
+
+    ```bash
+    mkdir -p /tmp/tpl_<format> && \
+    unzip -o cv_formats/<format>.docx -d /tmp/tpl_<format> >/dev/null && \
+    cat /tmp/tpl_<format>/word/document.xml
+    ```
+
+    Read `word/document.xml`. Identify the header block, each section heading,
+    and one representative experience entry (title paragraph, date paragraph,
+    bullet paragraph) to use as the repeat example.
 
 3. **Author the tokenized XML**: create
-   `.kiro/skills/generate-cv-document/templates/<format>/document.xml` as a copy
+   `<gen-skill-dir>/templates/<format>/document.xml` as a copy
    of the source `document.xml` with:
-   - header/summary/competencies/additional text replaced by the static tokens;
-   - section heading text replaced by `{{SECTION_*}}` tokens;
-   - the repeatable regions reduced to ONE example each, wrapped in the REPEAT
-     sentinels, with inner text replaced by the item tokens;
-   - everything else (styles, borders, tables, drawings/images, `sectPr`,
-     `rFonts`, `color`, `sz`, spacing) left byte-for-byte intact.
-   Preserve the exact `w:rPr`/`w:pPr` of each run/paragraph; only change `<w:t>`
-   text and insert the comment sentinels.
+    - header/summary/competencies/additional text replaced by the static tokens;
+    - section heading text replaced by `{{SECTION_*}}` tokens;
+    - the repeatable regions reduced to ONE example each, wrapped in the REPEAT
+      sentinels, with inner text replaced by the item tokens;
+    - everything else (styles, borders, tables, drawings/images, `sectPr`,
+      `rFonts`, `color`, `sz`, spacing) left byte-for-byte intact.
+      Preserve the exact `w:rPr`/`w:pPr` of each run/paragraph; only change `<w:t>`
+      text and insert the comment sentinels.
 
 4. **Package the template** by copying the ORIGINAL `.docx` entry-by-entry and
    swapping only `word/document.xml` — this keeps `styles.xml`, the footer,
    `customXml/*`, and any `media/` image. Do NOT rebuild from a subset of zip
    entries (that drops referenced parts and corrupts the file):
-   ```python
-   import zipfile
-   from pathlib import Path
-   fmt = "<format>"
-   src = Path(f"cv_formats/{fmt}.docx")
-   doc = Path(f".kiro/skills/generate-cv-document/templates/{fmt}/document.xml").read_text("utf-8")
-   out = Path(f".kiro/skills/generate-cv-document/templates/{fmt}.template.docx")
-   with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
-       for info in zin.infolist():
-           data = zin.read(info.filename)
-           if info.filename == "word/document.xml":
-               data = doc.encode("utf-8")
-           zout.writestr(info, data)
-   ```
+
+    ```python
+    import zipfile
+    from pathlib import Path
+    fmt = "<format>"
+    src = Path(f"cv_formats/{fmt}.docx")
+    doc = Path(f"<gen-skill-dir>/templates/{fmt}/document.xml").read_text("utf-8")
+    out = Path(f"<gen-skill-dir>/templates/{fmt}.template.docx")
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for info in zin.infolist():
+            data = zin.read(info.filename)
+            if info.filename == "word/document.xml":
+                data = doc.encode("utf-8")
+            zout.writestr(info, data)
+    ```
 
 5. **Extend the parser only if needed**: if the design introduces a section the
    generator doesn't know, add its heading text (English and Spanish) to
@@ -123,21 +136,21 @@ Rules that keep it fillable:
 ## Verification (always)
 
 - Run the generator against the new template for BOTH languages:
-  ```bash
-  python3 .kiro/skills/generate-cv-document/scripts/generate_cv.py \
-    --cv cv.md    --template .kiro/skills/generate-cv-document/templates/<format>.template.docx --out /tmp/<format>_en.docx
-  python3 .kiro/skills/generate-cv-document/scripts/generate_cv.py \
-    --cv cv_es.md --template .kiro/skills/generate-cv-document/templates/<format>.template.docx --out /tmp/<format>_es.docx
-  ```
-  A non-zero exit means a leftover `{{TOKEN}}` or unexpanded REPEAT/END sentinel
-  — fix the tokenized XML until it exits 0 and prints sensible counts
-  (experiences, bullets, skills, etc.).
+    ```bash
+    python3 <gen-skill-dir>/scripts/generate_cv.py \
+      --cv cv.md    --template <gen-skill-dir>/templates/<format>.template.docx --out /tmp/<format>_en.docx
+    python3 <gen-skill-dir>/scripts/generate_cv.py \
+      --cv cv_es.md --template <gen-skill-dir>/templates/<format>.template.docx --out /tmp/<format>_es.docx
+    ```
+    A non-zero exit means a leftover `{{TOKEN}}` or unexpanded REPEAT/END sentinel
+    — fix the tokenized XML until it exits 0 and prints sensible counts
+    (experiences, bullets, skills, etc.).
 - Inspect a generated `.docx` with the `office-mcp` tools:
-  - `word_get_info` — confirm it opens and the table/image counts match the
-    design's intent (e.g. a photo design should report `images: 1`).
-  - `word_list_paragraphs` — confirm the design's run styling (fonts, colors,
-    sizes) survived on the filled content, and that job/bullet counts match the
-    source.
+    - `word_get_info` — confirm it opens and the table/image counts match the
+      design's intent (e.g. a photo design should report `images: 1`).
+    - `word_list_paragraphs` — confirm the design's run styling (fonts, colors,
+      sizes) survived on the filled content, and that job/bullet counts match the
+      source.
 - Only after a clean round-trip, tell the user the format is ready and can be
   used with the generate-cv-document skill (`word` by default, `pdf` on request).
 
@@ -146,8 +159,8 @@ Rules that keep it fillable:
 - Never modify the canonical `cv.md` / `cv_es.md`. This skill only reads them
   for verification.
 - Never alter the user's original `cv_formats/<format>.docx`; it stays the
-  untouched design reference. The tokenized copy lives under
-  `.kiro/skills/generate-cv-document/templates/`.
+  untouched design reference. The tokenized copy lives under the
+  `generate-cv-document` skill's own `templates/` directory (`<gen-skill-dir>`).
 - Preserve the design's styling exactly; change only text and insert sentinels.
 - If the design can't be expressed with the existing token/sentinel vocabulary,
   explain the gap and propose the minimal parser/token extension before

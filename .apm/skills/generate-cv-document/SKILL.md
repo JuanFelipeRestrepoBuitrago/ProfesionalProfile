@@ -63,11 +63,18 @@ language. The photo input is not ambiguous: silently default to
 - Canonical sources (content, verbatim): `cv.md`, `cv_es.md`.
 - Format references (look & feel): `cv_formats/ats.docx`, `cv_formats/general.docx`.
 - Tokenized templates (used by the generator):
-  `.kiro/skills/generate-cv-document/templates/ats.template.docx`,
-  `.kiro/skills/generate-cv-document/templates/general.template.docx`.
-- Generator: `.kiro/skills/generate-cv-document/scripts/generate_cv.py`.
+  `<skill-dir>/templates/ats.template.docx`,
+  `<skill-dir>/templates/general.template.docx`.
+- Generator: `<skill-dir>/scripts/generate_cv.py`.
 - Editable token source per format (for restyling the template):
-  `.kiro/skills/generate-cv-document/templates/<format>/document.xml`.
+  `<skill-dir>/templates/<format>/document.xml`.
+
+`<skill-dir>` is this skill's own directory, wherever the agent harness
+deployed it — `.kiro/skills/generate-cv-document/` under Kiro,
+`.claude/skills/generate-cv-document/` under Claude Code,
+`.agents/skills/generate-cv-document/` under Codex. Resolve it once from the
+path of this `SKILL.md` and use it for every command below; never hardcode a
+single harness's folder.
 
 ## Steps
 
@@ -75,9 +82,9 @@ language. The photo input is not ambiguous: silently default to
 2. Run the generator with absolute paths:
 
     ```bash
-    python3 .kiro/skills/generate-cv-document/scripts/generate_cv.py \
+    python3 <skill-dir>/scripts/generate_cv.py \
       --cv <cv.md|cv_es.md> \
-      --template .kiro/skills/generate-cv-document/templates/<format>.template.docx \
+      --template <skill-dir>/templates/<format>.template.docx \
       --out results/cv_<lang>_<format>.docx \
       --photo resources/<photo>      # photo formats only; omit for ats
     ```
@@ -125,7 +132,7 @@ language. The photo input is not ambiguous: silently default to
 ## Updating a template's look (restyling)
 
 The template's design lives in
-`.kiro/skills/generate-cv-document/templates/<format>/document.xml` — the loose,
+`<skill-dir>/templates/<format>/document.xml` — the loose,
 human-editable tokenized XML. To change colors, sizes, spacing, or the photo
 size, edit that file, then repackage the `.docx` template by copying the
 original `cv_formats/<format>.docx` and replacing only `word/document.xml`
@@ -135,8 +142,8 @@ original `cv_formats/<format>.docx` and replacing only `word/document.xml`
 import zipfile
 from pathlib import Path
 src = Path("cv_formats/<format>.docx")
-doc = Path(".kiro/skills/generate-cv-document/templates/<format>/document.xml").read_text("utf-8")
-out = Path(".kiro/skills/generate-cv-document/templates/<format>.template.docx")
+doc = Path("<skill-dir>/templates/<format>/document.xml").read_text("utf-8")
+out = Path("<skill-dir>/templates/<format>.template.docx")
 with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
     for info in zin.infolist():
         data = zin.read(info.filename)

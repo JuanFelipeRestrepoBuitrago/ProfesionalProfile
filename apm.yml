@@ -7,6 +7,8 @@ author: Juan Felipe Restrepo Buitrago
 # Resolution order: --target flag > this field > auto-detect from filesystem.
 targets:
     - kiro
+    - claude
+    - codex
 dependencies:
     apm:
         # engram instructions

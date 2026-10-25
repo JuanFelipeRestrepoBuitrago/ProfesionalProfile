@@ -24,6 +24,9 @@ cv_formats/*
 cv.md
 cv_es.md
 
+# Job Preferences source
+job_preferences.md
+
 # Common noise
 .DS_Store
 __pycache__/

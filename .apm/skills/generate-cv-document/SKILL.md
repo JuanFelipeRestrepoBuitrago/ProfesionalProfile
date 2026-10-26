@@ -54,6 +54,13 @@ only for the optional final PDF conversion and for verification.
       the real format from the bytes. A standard JPEG/PNG headshot works.
     - Formats without a photo (e.g. `ats`) ignore this input.
 
+5. **source** (optional) — a derived CV Markdown to render instead of the
+   canonical file, e.g. a job-tailored CV written by the `tailor-cv-for-job`
+   skill under `results/applications/`. It must follow the canonical structure
+   (see "How the canonical Markdown maps to fields"). When a source is given,
+   its language comes from the caller, and the caller may also set the output
+   path. Without a source, use the canonical file for the language.
+
 If any input is missing or ambiguous, ask one concise question. Do not guess the
 language. The photo input is not ambiguous: silently default to
 `resources/DEFAULT.jpg` unless the user names another file.
@@ -83,7 +90,7 @@ single harness's folder.
 
     ```bash
     python3 <skill-dir>/scripts/generate_cv.py \
-      --cv <cv.md|cv_es.md> \
+      --cv <cv.md|cv_es.md|derived source> \
       --template <skill-dir>/templates/<format>.template.docx \
       --out results/cv_<lang>_<format>.docx \
       --photo resources/<photo>      # photo formats only; omit for ats
@@ -105,8 +112,10 @@ single harness's folder.
    must be available; if it is not, report that instead of claiming success.
    Keep the `.docx` as well.
 4. Output path: `results/cv_<language>_<format>.<ext>` (e.g.
-   `results/cv_en_ats.docx`, `results/cv_es_general.pdf`). Create `results/` if
-   needed. Use absolute paths for `office-mcp` calls.
+   `results/cv_en_ats.docx`, `results/cv_es_general.pdf`). For a derived source,
+   use the output path the caller gives (default: next to the source, same
+   stem, e.g. `results/applications/cv_en_ats_canals_junior-software-engineer.docx`).
+   Create the folder if needed. Use absolute paths for `office-mcp` calls.
 
 ## Verification (always)
 
@@ -193,8 +202,10 @@ The generator expects the canonical CV structure already used by `cv.md` /
 
 ## Rules
 
-- Content comes only from the canonical CV of the requested language. The format
-  controls layout, never facts. Never translate; use the right language's file.
+- Content comes only from the canonical CV of the requested language, or from a
+  derived source passed in explicitly (e.g. by `tailor-cv-for-job`), rendered
+  as is. The format controls layout, never facts. Never translate; use the
+  right language's file.
 - Never overwrite the canonical `cv.md` / `cv_es.md` or the `cv_formats/`
   samples. Outputs go under `results/` only.
 - The header photo for photo formats comes from `resources/`; default to

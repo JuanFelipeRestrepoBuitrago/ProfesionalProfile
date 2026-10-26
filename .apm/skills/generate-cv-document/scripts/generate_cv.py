@@ -409,7 +409,8 @@ def main(argv: list[str]) -> int:
         "--cv",
         required=True,
         type=Path,
-        help="Path to the canonical CV markdown (cv.md / cv_es.md).",
+        help="Path to the CV markdown (cv.md / cv_es.md, or a derived file "
+        "with the same structure, e.g. a job-tailored CV).",
     )
     ap.add_argument(
         "--template",

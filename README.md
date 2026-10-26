@@ -293,6 +293,18 @@ bullets you have. Photo formats pull the headshot from `resources/`
 > "Make my English CV in the ATS format." ·
 > "Export my Spanish CV as PDF in the general format using headshot.jpg."
 
+### `tailor-cv-for-job`
+
+Builds one tailored CV per job application as an **ATS-format PDF**. Jobs come
+from a LinkedIn link, any job-posting URL, or picks from `results/jobs.md`.
+Rewrites the headline/summary and reorders bullets and skills to match the job
+and company, without adding anything the canonical CV does not contain. English
+by default, Spanish only on explicit request. Output:
+`results/applications/cv_<lang>_ats_<company>_<role>.pdf`, plus a gap report.
+
+> "Make CVs for the Canals and Fracttal jobs." ·
+> "Tailor my CV in Spanish for https://www.linkedin.com/jobs/view/4482874945/."
+
 ### `add-cv-template`
 
 Turns a styled `.docx` you drop into `cv_formats/` into a reusable,
